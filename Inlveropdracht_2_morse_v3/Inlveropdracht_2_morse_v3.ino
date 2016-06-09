@@ -58,26 +58,25 @@ void setup() {
   enterStandBy();
 
   Serial.begin(9600);
-
 }
 
 void loop() {
   currentTimestamp = millis();
-  if (digitalRead(inputButton) == HIGH){
+  if (digitalRead(inputButton) == HIGH){          //The inputbutton is pressed
     delay(100);
     writeToDisplay("Writing Mode", 1, 0);
     delay(500);
     lastTimestamp = currentTimestamp;
-    writeMorseMessage();
+    writeMorseMessage();                          
   }
-  else if(digitalRead(inputWire) == HIGH && currentTimestamp > 5000){
+  else if(digitalRead(inputWire) == HIGH && currentTimestamp > 5000){    // A signal form the other arduino is received
     delay(100);
-    digitalWrite(outputWire, HIGH);
+    digitalWrite(outputWire, HIGH);       // Send a reply to confirm that this machine is in receiving state
     delay(50);
     digitalWrite(outputWire, LOW);
     writeToDisplay("Receiving Mode", 1, 0);
     lastTimestamp = currentTimestamp;
-    receiveMessage();
+    receiveMessage();                    // start receive message process
   }
 
 }
@@ -85,7 +84,7 @@ void loop() {
 void writeMorseMessage(){
   resetBuffer();
   boolean messageSent = false;
-  while(!messageSent){
+  while(!messageSent){                                        // Keeps looping until a message is sent
     currentTimestamp = millis();
     duration = currentTimestamp - lastTimestamp;
     if (digitalRead(deleteButton) == HIGH){                   // The delete button is pressed
@@ -102,14 +101,14 @@ void writeMorseMessage(){
     else if(digitalRead(sendButton) == HIGH){                 //The send button is pressed
       delay(100);
       writeToDisplay("Sending...", 1, 0);
-      messageSent = sendMessage();
+      messageSent = sendMessage();                           // Try to send message. If succesful sendMessage() returns true
     }
     else if (digitalRead(inputButton) == HIGH){               //The inputbutton is pressed
       if(!buttonWasPressed){
         lastTimestamp = currentTimestamp;
         buttonWasPressed = true;
-        if (duration > wordPause && plainTextMessage.length() > 0){
-          plainTextMessage += " ";
+        if (duration > wordPause && plainTextMessage.length() > 0){  // The button was in a released state for a longer duration than the duration of a word pause
+          plainTextMessage += " ";                                   // Add a space to the plain text message
           writeMessageToDisplay(); 
         }
       }
@@ -142,43 +141,42 @@ void writeMorseMessage(){
 }
 
 boolean sendMessage(){
-  digitalWrite(outputWire, HIGH);
+  digitalWrite(outputWire, HIGH);                    // Send a signal to the other arduino that a message is ready to be sent
   delay(75);
   digitalWrite(outputWire, LOW);
   delay(50);
-  if(digitalRead(inputWire) == HIGH){
-    for(int i=0; i < plainTextMessage.length(); i++){
-      letterToMorse(plainTextMessage[i]);
+  if(digitalRead(inputWire) == HIGH){                   //Check if the other arduino sends a confirmation signal
+    for(int i=0; i < plainTextMessage.length(); i++){   
+      letterToMorse(plainTextMessage[i]);               // Loop through all characters of the plain text message and send them as morse code
     }
-    digitalWrite(outputWire, HIGH);
+    digitalWrite(outputWire, HIGH);                     // Send a signal to the other arduino to mark the end of the message
     delay(2000);
     digitalWrite(outputWire, LOW);
-    plainTextMessage = "";
+    plainTextMessage = "";                              // Reset the plain text message to an empty string
     writeToDisplay("Message sent", 1, 0);
     return true;
   }
-  else{
+  else{                                                 // No confirmation signal was received
     writeToDisplay("Failed to send", 1, 400);
     return false;
   }
 }
 
 void receiveMessage(){
-  Serial.print("receiving");
   boolean messageReceived = false;
   while (!messageReceived){
     currentTimestamp = millis();
     duration = currentTimestamp - lastTimestamp;
-    if (digitalRead(inputWire) == HIGH){
+    if (digitalRead(inputWire) == HIGH){           //Signal is on
       if(!signalReceived){
         lastTimestamp = currentTimestamp;
         signalReceived = true;
-        if(duration > wordPause){
-          plainTextMessage += " ";
+        if(duration > wordPause){                  //The signal was of for a duration longer than the duration of a word Pause
+          plainTextMessage += " ";                 //Add a space character to the plain text message
         }
       }
-      else if (signalReceived){
-        if(duration > 1500){
+      else if (signalReceived){           
+        if(duration > 1500){                            //The end off message signal is received
           writeToDisplay("Message received", 1, 400);
           delay(500);
           messageReceived = true;
@@ -187,13 +185,13 @@ void receiveMessage(){
       }
     }
     else{
-      if(signalReceived && duration > signalGap){
-        if(duration < dotDuration + signalGap){
-          signalBuffer[bufferIndex] = DOT;
+      if(signalReceived && duration > signalGap){    // The input signal just turned off
+        if(duration < dotDuration + signalGap){      // The signal was on for a duration shorter than the dot duration
+          signalBuffer[bufferIndex] = DOT;           // Add a dot to the buffer
           bufferIndex++;
         }
-        else{
-          signalBuffer[bufferIndex] = DASH;
+        else{                                       // The signal was on for a duration longer than the dot duration
+          signalBuffer[bufferIndex] = DASH;         // Add a dash to the buffer
           bufferIndex++;
         }
         signalReceived = false;
@@ -201,10 +199,9 @@ void receiveMessage(){
       }
       else{
         if(bufferIndex > 0){
-          if (duration > letterPause || bufferIndex > 4){
-            plainTextMessage += bufferToLetter();
-            writeMessageToDisplay();
-            Serial.println(plainTextMessage);
+          if (duration > letterPause || bufferIndex > 4){   // The signal was off for a duration longer than the letter pause or the buffer
+            plainTextMessage += bufferToLetter();           // Convert the symbols held in the buffer to a letter and ad that letter to the plain text messgae
+            writeMessageToDisplay();                                      
             resetBuffer();
           }
         }
@@ -218,32 +215,35 @@ void receiveMessage(){
 // Writes the plain text message to the display
 void writeMessageToDisplay(){
   clearLine(0);
-  if (plainTextMessage.length() < 17){
-    for (int i=0; i< plainTextMessage.length(); i++){
+  if (plainTextMessage.length() < 17){                        // The message is 16 characters or shorter
+    for (int i=0; i< plainTextMessage.length(); i++){         // The entire message is printed to the display
       lcd.setCursor(i,0);
       lcd.print(plainTextMessage[i]);
     }
   }
-  if (plainTextMessage.length() > 16){
-    for(int i = 16; i >0; i--){
+  if (plainTextMessage.length() > 16){                      // The message is longer than 16 characters 
+    for(int i = 16; i >0; i--){                             // Only the last 16 characters are printed to the display
       lcd.setCursor(16-i,0);
       lcd.print(plainTextMessage[plainTextMessage.length()-i]);
     }
   }
 }
 
-
-void writeToDisplay(String text, int col, int scrollSpeed){
-  clearLine(col);
-  lcd.print(text);
-  if(text.length() > 16){
-    for(int i = 0; i < text.length()-16; i++){
+// Writes a string to a specified line of the display (top row or bottom row)
+void writeToDisplay(String text, int row, int scrollSpeed){
+  clearLine(row);                             // Clear the row where the text will be displayed
+  lcd.print(text);                  
+  if(text.length() > 16){                         // text is longer that 16 characters
+    for(int i = 0; i < text.length()-16; i++){    
       delay(scrollSpeed);
-      lcd.scrollDisplayLeft();
+      lcd.scrollDisplayLeft();                    // Scroll the display to display the entire text
     }
   }
 }
 
+// This code is run after exiting the receive loop and the write loop
+// It prints the text "stand by" to the display
+// It resets the text message to and empty string and it resets the buffer
 void enterStandBy(){
   delay(1000);
   lcd.clear();
@@ -254,14 +254,15 @@ void enterStandBy(){
 }
 
 // clears a line of the lcd display and places the cursor at the start of that line
-void clearLine(int col){
+void clearLine(int row){
   for (int i = 0; i < 16; i++){
-    lcd.setCursor(i, col);
+    lcd.setCursor(i, row);
     lcd.print(' ');
   }
-  lcd.setCursor(0,col);
+  lcd.setCursor(0,row);
 }
 
+// sets all butes of the buffer to 0 and sets buffer index to 0
 void resetBuffer(){
   for(int i=0; i<5; i++){
     signalBuffer[i] = 0;
@@ -366,6 +367,7 @@ void letterToMorse(char letter){
   }
 }
 
+//Sends a letter in morse code
 void sendLetterInMorse(byte s0, byte s1, byte s2, byte s3, byte s4){
   if (sendSignal(s0)){
     delay(signalGap * 0.8);
@@ -383,15 +385,16 @@ void sendLetterInMorse(byte s0, byte s1, byte s2, byte s3, byte s4){
   delay(letterPause);
 }
 
+//Sends morse signals to the other arduino
 boolean sendSignal(byte morseSignal){
   switch(morseSignal){
-    case 1: //in case of a dot
-      digitalWrite(outputWire, HIGH);
+    case 1:                           //the byte has the value DOT or 1
+      digitalWrite(outputWire, HIGH); //send a signal to the other arduino for the duration of a dot
       delay(dotDuration);
       digitalWrite(outputWire, LOW);
       return true;
-    case 2: //in case of a dash
-      digitalWrite(outputWire, HIGH);
+    case 2:                           //the byte has the value DASH or 2
+      digitalWrite(outputWire, HIGH); //send a signal to the other arduino for the duration of a dash
       delay(dashDuration);
       digitalWrite(outputWire, LOW);
       return true;
